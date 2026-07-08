@@ -13,7 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Flit - P2P File Sharing",
+  metadataBase: new URL("https://flint.manasbuild.me"),
+  title: "Flint - P2P File Sharing",
   description: "Send files browser-to-browser, peer-to-peer. No uploads, no storage.",
 };
 
