@@ -5,7 +5,9 @@ export function createSignaling(
   role: Role,
   onMessage: (msg: SignalMessage) => void,
 ) {
-  const url = process.env.NEXT_PUBLIC_SIGNALING_URL ?? "ws://localhost:8080";
+  const url =
+    process.env.NEXT_PUBLIC_SIGNALING_URL ??
+    "wss://flintmanasbuilds.up.railway.app";
   const ws = new WebSocket(url);
   ws.onopen = () => ws.send(JSON.stringify({ type: "join", roomId, role }));
   ws.onmessage = (event) => {
