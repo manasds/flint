@@ -5,10 +5,11 @@ export function createSignaling(
   role: Role,
   onMessage: (msg: SignalMessage) => void,
 ) {
-  const url =
+  const base = (
     process.env.NEXT_PUBLIC_SIGNALING_URL ??
-    "wss://flintmanasbuilds.up.railway.app";
-  const ws = new WebSocket(url);
+    "wss://flintmanasbuilds.up.railway.app"
+  ).replace(/\/$/, "");
+  const ws = new WebSocket(`${base}/${encodeURIComponent(roomId)}`);
   ws.onopen = () => ws.send(JSON.stringify({ type: "join", roomId, role }));
   ws.onmessage = (event) => {
     const msg = JSON.parse(event.data) as SignalMessage;
