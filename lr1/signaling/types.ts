@@ -7,7 +7,7 @@ export type SignalMessage =
   | { type: "join"; roomId: string; role: Role }
   | { type: "peer-joined"; role: Role }
   | { type: "peer-left"; role: Role }
-  | { type: "offer"; sdp: unknown }
-  | { type: "answer"; sdp: unknown }
-  | { type: "ice-candidate"; candidate: unknown }
+  | { type: "offer"; sdp: unknown; session?: string }
+  | { type: "answer"; sdp: unknown; session?: string }
+  | { type: "ice-candidate"; candidate: unknown; session?: string }
   | { type: "error"; message: string };
