@@ -1,281 +1,143 @@
-"use client";
+import type { Metadata } from "next";
+import SendFiles from "@/components/SendFiles";
+import { AUTHOR, FAQ, SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/lib/site";
 
-import { useEffect, useRef, useState } from "react";
-import QRCode from "qrcode";
-import FileList from "@/components/FileList";
-import StatusDot, { type Tone } from "@/components/StatusDot";
-import TransferProgress from "@/components/TransferProgress";
-import { itemsFromDrop, itemsFromFileList, mergeItems, type SendItem } from "@/lib/files";
-import { randomId } from "@/lib/protocol";
-import { SenderSession, type SenderPhase, type SenderSnapshot } from "@/lib/sender";
-
-const STATUS: Record<SenderPhase, { tone: Tone; label: string }> = {
-  waiting: { tone: "pending", label: "Waiting for receiver" },
-  connecting: { tone: "pending", label: "Connecting" },
-  "awaiting-accept": { tone: "pending", label: "Waiting for accept" },
-  transferring: { tone: "ok", label: "Sending" },
-  finishing: { tone: "pending", label: "Finishing" },
-  reconnecting: { tone: "pending", label: "Reconnecting" },
-  done: { tone: "ok", label: "Delivered" },
-  declined: { tone: "bad", label: "Declined" },
-  cancelled: { tone: "idle", label: "Cancelled" },
-  error: { tone: "bad", label: "Failed" },
+// The root layout is shared with /r/[id]; only the landing page is canonical.
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
 };
 
+const jsonLd = [
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    name: SITE_NAME,
+    url: SITE_URL,
+    description: SITE_DESCRIPTION,
+    applicationCategory: "UtilitiesApplication",
+    operatingSystem: "Any (web browser)",
+    browserRequirements: "Requires a browser with WebRTC support.",
+    offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    author: { "@type": "Person", name: AUTHOR.name, url: AUTHOR.url },
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: FAQ.map(({ question, answer }) => ({
+      "@type": "Question",
+      name: question,
+      acceptedAnswer: { "@type": "Answer", text: answer },
+    })),
+  },
+];
+
 export default function Home() {
-  const [items, setItems] = useState<SendItem[]>([]);
-  /** Non-null while a share link is live. */
-  const [roomId, setRoomId] = useState<string | null>(null);
-  const sharing = roomId !== null;
-  const [link, setLink] = useState("");
-  const [qr, setQr] = useState("");
-  const [snap, setSnap] = useState<SenderSnapshot | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [dragOver, setDragOver] = useState(false);
-  const sessionRef = useRef<SenderSession | null>(null);
-
-  useEffect(() => {
-    if (!roomId || !items.length) return;
-    const session = new SenderSession(items, roomId, setSnap);
-    sessionRef.current = session;
-    session.start();
-    if (process.env.NODE_ENV !== "production") {
-      // Dev-only handle for debugging/e2e tests (e.g. simulating a dropped link).
-      (window as unknown as { __flintSender?: SenderSession }).__flintSender = session;
-    }
-    return () => {
-      session.dispose();
-      sessionRef.current = null;
-    };
-  }, [roomId, items]);
-
-  function startSharing() {
-    const id = randomId(10);
-    const url = `${window.location.origin}/r/${id}`;
-    setRoomId(id);
-    setLink(url);
-    setQr("");
-    QRCode.toDataURL(url, { width: 220, margin: 1 }).then(setQr).catch(() => {});
-  }
-
-  // Warn before closing the tab mid-transfer.
-  useEffect(() => {
-    const onBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (sessionRef.current?.busy) e.preventDefault();
-    };
-    window.addEventListener("beforeunload", onBeforeUnload);
-    return () => window.removeEventListener("beforeunload", onBeforeUnload);
-  }, []);
-
-  function addItems(incoming: SendItem[]) {
-    if (incoming.length) setItems((cur) => mergeItems(cur, incoming));
-  }
-
-  function reset() {
-    setRoomId(null);
-    setItems([]);
-    setSnap(null);
-    setLink("");
-    setQr("");
-  }
-
-  async function copyLink() {
-    await navigator.clipboard.writeText(link);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  }
-
-  const phase = snap?.phase;
-  const showLink = sharing && (!phase || phase === "waiting" || phase === "connecting");
-  const showProgress =
-    phase === "transferring" || phase === "finishing" || phase === "reconnecting" || phase === "done";
-  const final = phase === "done" || phase === "declined" || phase === "cancelled" || phase === "error";
-  const status = phase ? STATUS[phase] : null;
-
   return (
-    <main className="flex flex-1 items-center justify-center bg-gradient-to-b from-zinc-50 to-zinc-100 p-4 sm:p-6 dark:from-zinc-950 dark:to-black">
-      <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-8 dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-            Flint
+    <main className="flex flex-1 flex-col bg-gradient-to-b from-zinc-50 to-zinc-100 dark:from-zinc-950 dark:to-black">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
+      />
+
+      <section className="flex min-h-[85vh] flex-col items-center justify-center gap-8 px-4 py-12 sm:px-6">
+        <div className="max-w-xl text-center">
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 sm:text-3xl dark:text-zinc-50">
+            Peer-to-peer file sharing in your browser
           </h1>
-          {sharing && status && <StatusDot tone={status.tone} label={status.label} />}
+          <p className="mt-3 text-sm text-zinc-600 sm:text-base dark:text-zinc-400">
+            Send files without uploading them anywhere. Flint uses WebRTC to move your file
+            straight to the other device. Free, with no signup.
+          </p>
         </div>
+        <SendFiles />
+      </section>
 
-        {!sharing ? (
-          <div className="flex flex-col gap-4">
-            <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragOver(true);
-              }}
-              onDragLeave={(e) => {
-                // dragleave also fires when moving onto a child element; ignore those.
-                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragOver(false);
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDragOver(false);
-                itemsFromDrop(e.dataTransfer).then(addItems);
-              }}
-              className={`flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-8 text-center transition-colors ${
-                dragOver
-                  ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-950/30"
-                  : "border-zinc-300 dark:border-zinc-700"
-              }`}
-            >
-              <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                Drop files or folders here
-              </span>
-              <div className="flex gap-2">
-                <PickButton label="Choose files" onPick={addItems} />
-                <PickButton label="Choose folder" directory onPick={addItems} />
+      <article className="mx-auto w-full max-w-2xl px-4 pb-16 text-zinc-700 sm:px-6 dark:text-zinc-300">
+        <Section title="How WebRTC file transfer works">
+          <p>
+            Flint is a P2P file transfer tool that runs entirely in your browser. Pick files or a
+            folder and Flint creates a one-time link and QR code. The other person opens it, sees
+            the file names and sizes, and accepts. The two browsers then connect directly and the
+            files travel between them over <strong>WebRTC data channels</strong>.
+          </p>
+          <ol className="mt-3 list-decimal space-y-2 pl-5">
+            <li>
+              <strong>Signaling.</strong> A small signaling server passes connection details
+              between the two browsers over a WebSocket: the session description (offer and
+              answer) and network candidates. It never receives any of your file.
+            </li>
+            <li>
+              <strong>Finding a route.</strong> Each browser asks a public STUN server for its
+              public address, so the two devices can reach each other even behind home routers.
+              Flint doesn&apos;t run a TURN relay, so networks that block every direct connection
+              won&apos;t work.
+            </li>
+            <li>
+              <strong>Transfer.</strong> Files stream in chunks over several data channels at
+              once. The receiver writes them to disk and confirms each one, so the sender only
+              shows &ldquo;Delivered&rdquo; once everything is saved.
+            </li>
+          </ol>
+        </Section>
+
+        <Section title="Features">
+          <ul className="list-disc space-y-2 pl-5">
+            <li>
+              <strong>P2P file transfer, no signup.</strong> No account, no login, no email
+              address.
+            </li>
+            <li>
+              <strong>Send files without uploading.</strong> Your file goes straight to the
+              other device and is never stored on a server.
+            </li>
+            <li>
+              <strong>Files and folders.</strong> Send many files or a whole folder over one
+              link. The receiver previews names and sizes, then accepts or declines.
+            </li>
+            <li>
+              <strong>Share by link or QR code.</strong> Copy the link, or scan the QR code to
+              move a file from your laptop to your phone.
+            </li>
+            <li>
+              <strong>Any file type.</strong> Documents, photos, videos, archives: Flint sends
+              the raw bytes, unchanged.
+            </li>
+          </ul>
+        </Section>
+
+        <Section title="Is it secure?">
+          <p>
+            Every WebRTC data channel is encrypted with DTLS. This is built into the WebRTC
+            standard and can&apos;t be switched off, and the encryption keys are negotiated by the
+            two browsers. The signaling server only relays connection setup messages; your files
+            never pass through it and never sit on a server. Nothing downloads until the receiver
+            accepts. Each link serves one receiver
+            and stops working when you close the tab, so share it only with the person it&apos;s for.
+          </p>
+        </Section>
+
+        <Section title="Frequently asked questions">
+          <dl className="space-y-5">
+            {FAQ.map(({ question, answer }) => (
+              <div key={question}>
+                <dt className="font-medium text-zinc-900 dark:text-zinc-100">{question}</dt>
+                <dd className="mt-1">{answer}</dd>
               </div>
-            </div>
-
-            {items.length > 0 && (
-              <>
-                <FileList
-                  files={items.map((i) => ({ path: i.path, size: i.file.size }))}
-                  onRemove={(idx) => setItems((cur) => cur.filter((_, i) => i !== idx))}
-                />
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setItems([])}
-                    className="rounded-lg px-3 py-2.5 text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                  >
-                    Clear
-                  </button>
-                  <button
-                    onClick={startSharing}
-                    className="flex-1 rounded-lg bg-indigo-500 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-600"
-                  >
-                    Create share link
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        ) : (
-          <div className="flex flex-col gap-6">
-            <FileList files={items.map((i) => ({ path: i.path, size: i.file.size }))} />
-
-            {showLink && (
-              <div className="flex flex-col items-center gap-4">
-                {qr && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={qr} alt="QR code" className="rounded-lg bg-white p-2" width={180} height={180} />
-                )}
-                <div className="flex w-full items-center gap-2">
-                  <input
-                    readOnly
-                    value={link}
-                    className="min-w-0 flex-1 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-                  />
-                  <button
-                    onClick={copyLink}
-                    className="shrink-0 rounded-lg bg-indigo-500 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-indigo-600"
-                  >
-                    {copied ? "Copied" : "Copy"}
-                  </button>
-                </div>
-                <p className="text-center text-xs text-zinc-500">
-                  Keep this tab open. Share the link; the receiver will see the file list and can
-                  accept or decline.
-                </p>
-              </div>
-            )}
-
-            {phase === "awaiting-accept" && (
-              <p className="text-center text-sm text-zinc-500">
-                Receiver connected. Waiting for them to accept…
-              </p>
-            )}
-
-            {showProgress && snap && (
-              <div className="flex flex-col gap-2">
-                <TransferProgress done={snap.written} total={snap.total} speed={snap.speed} />
-                {snap.fileCount > 1 && (
-                  <p className="text-xs text-zinc-500">
-                    {snap.filesDone} of {snap.fileCount} files saved by receiver
-                  </p>
-                )}
-              </div>
-            )}
-
-            {snap?.message && !final && (
-              <p className="text-center text-xs text-amber-600 dark:text-amber-500">{snap.message}</p>
-            )}
-            {phase === "finishing" && (
-              <p className="text-center text-xs text-zinc-500">
-                All data sent. Waiting for the receiver to confirm it&apos;s saved. Keep this tab open.
-              </p>
-            )}
-            {phase === "done" && (
-              <p className="text-center text-sm font-medium text-green-600 dark:text-green-500">
-                Delivered. The receiver confirmed {snap!.fileCount === 1 ? "the file is" : "all files are"} saved.
-              </p>
-            )}
-            {(phase === "declined" || phase === "cancelled" || phase === "error") && (
-              <p className="text-center text-sm font-medium text-red-600 dark:text-red-500">
-                {snap?.message ?? "Transfer stopped."}
-              </p>
-            )}
-
-            {final ? (
-              <button
-                onClick={reset}
-                className="rounded-lg bg-indigo-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-600"
-              >
-                Send more files
-              </button>
-            ) : (
-              <button
-                onClick={() => {
-                  if (phase && phase !== "waiting") {
-                    sessionRef.current?.cancel();
-                  } else {
-                    // Nobody connected yet: just go back to editing the selection.
-                    setRoomId(null);
-                    setSnap(null);
-                  }
-                }}
-                className="rounded-lg px-4 py-2.5 text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-              >
-                Cancel
-              </button>
-            )}
-          </div>
-        )}
-      </div>
+            ))}
+          </dl>
+        </Section>
+      </article>
     </main>
   );
 }
 
-function PickButton({
-  label,
-  directory,
-  onPick,
-}: {
-  label: string;
-  directory?: boolean;
-  onPick: (items: SendItem[]) => void;
-}) {
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <label className="cursor-pointer rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:border-indigo-400 dark:border-zinc-600 dark:text-zinc-300">
-      {label}
-      <input
-        type="file"
-        multiple
-        className="hidden"
-        ref={(el) => {
-          if (el && directory) el.setAttribute("webkitdirectory", "");
-        }}
-        onChange={(e) => {
-          onPick(itemsFromFileList(e.target.files));
-          e.target.value = "";
-        }}
-      />
-    </label>
+    <section className="mt-12 text-sm leading-relaxed sm:text-base">
+      <h2 className="mb-3 text-lg font-semibold text-zinc-900 sm:text-xl dark:text-zinc-50">
+        {title}
+      </h2>
+      {children}
+    </section>
   );
 }

@@ -27,6 +27,14 @@ NEXT_PUBLIC_SIGNALING_URL=ws://127.0.0.1:8787 pnpm dev
 
 If `NEXT_PUBLIC_SIGNALING_URL` is unset, the frontend falls back to the legacy Railway host for now. Set the env var for local Worker development.
 
+## Cloudflare login
+
+Login does not require a local install:
+
+```bash
+npx wrangler@latest login
+```
+
 ## Deploy
 
 ```bash
