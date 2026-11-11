@@ -1,17 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import FileList from "@/components/FileList";
 import StatusDot, { type Tone } from "@/components/StatusDot";
 import TransferProgress from "@/components/TransferProgress";
 import { formatBytes } from "@/lib/format";
+import { Banner, btn, Card, DownloadIcon, FolderIcon, SparkIcon } from "@/components/ui";
 import { ReceiverSession, type ReceiverPhase, type ReceiverSnapshot } from "@/lib/receiver";
 import { pickFolder, supportsFolderSave } from "@/lib/sinks";
 
 const STATUS: Record<ReceiverPhase, { tone: Tone; label: string }> = {
   connecting: { tone: "pending", label: "Connecting" },
-  offer: { tone: "pending", label: "Incoming files" },
+  offer: { tone: "pending", label: "Needs your OK" },
   transferring: { tone: "ok", label: "Receiving" },
   reconnecting: { tone: "pending", label: "Reconnecting" },
   done: { tone: "ok", label: "Done" },
@@ -87,56 +89,37 @@ export default function ReceivePage() {
   const inProgress = phase === "transferring" || phase === "reconnecting";
 
   return (
-    <main className="flex flex-1 items-center justify-center bg-gradient-to-b from-zinc-50 to-zinc-100 p-4 sm:p-6 dark:from-zinc-950 dark:to-black">
-      <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-8 dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-            Flint
+    <main className="flex flex-1 items-start justify-center px-4 pt-10 pb-16 sm:items-center sm:px-6 sm:py-16">
+      <Card>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <h1 className="text-sm font-medium text-fg">
+            {phase === "done" ? "Received" : "Incoming files"}
           </h1>
           <StatusDot tone={status.tone} label={status.label} />
         </div>
 
         {!showFiles && (phase === "connecting" || phase === "reconnecting") && (
-          <p className="py-8 text-center text-sm text-zinc-500">Connecting to sender…</p>
+          <div className="flex flex-col items-center gap-4 py-10 text-center">
+            <SparkIcon className="size-5 animate-pulse text-fg" />
+            <div>
+              <p className="text-sm font-medium text-fg">Connecting to the sender…</p>
+              <p className="mt-1 text-xs text-muted">This usually takes a second or two.</p>
+            </div>
+          </div>
         )}
 
         {showFiles && (
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-5">
             {phase === "offer" && (
-              <p className="text-sm text-zinc-700 dark:text-zinc-300">
-                Someone wants to send you {files.length === 1 ? "a file" : `${files.length} files`} (
-                {formatBytes(snap!.total)}). Nothing is downloaded until you accept.
-              </p>
-            )}
-
-            <FileList files={files} done={doneSet} links={links} />
-
-            {phase === "offer" && (
-              <div className="flex flex-col gap-2">
-                {canPickFolder && (
-                  <button
-                    onClick={saveToFolder}
-                    className="rounded-lg bg-indigo-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-600"
-                  >
-                    Accept and save to folder…
-                  </button>
-                )}
-                <button
-                  onClick={() => sessionRef.current?.accept()}
-                  className={
-                    canPickFolder
-                      ? "rounded-lg border border-zinc-300 px-4 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800"
-                      : "rounded-lg bg-indigo-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-600"
-                  }
-                >
-                  {canPickFolder ? "Accept (download in browser)" : "Accept"}
-                </button>
-                <button
-                  onClick={() => sessionRef.current?.decline()}
-                  className="rounded-lg px-4 py-2.5 text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                >
-                  Decline
-                </button>
+              <div>
+                <p className="text-xl font-semibold tracking-tight text-fg">
+                  {files.length === 1 ? "1 file" : `${files.length} files`}
+                  <span className="font-mono text-base font-normal text-muted"> · {formatBytes(snap!.total)}</span>
+                </p>
+                <p className="mt-1 text-sm text-muted">
+                  Someone wants to send you {files.length === 1 ? "this file" : "these files"}.
+                  Nothing downloads until you accept.
+                </p>
               </div>
             )}
 
@@ -144,36 +127,53 @@ export default function ReceivePage() {
               <TransferProgress done={snap.written} total={snap.total} speed={snap.speed} />
             )}
 
+            {phase === "done" && snap?.sinkKind === "folder" && (
+              <Banner tone="ok" title="All saved">
+                Saved to the folder you chose.
+              </Banner>
+            )}
+
+            <FileList files={files} done={doneSet} links={links} />
+
+            {phase === "offer" && (
+              <div className="flex flex-col gap-2">
+                {canPickFolder && (
+                  <button onClick={saveToFolder} className={btn.primary}>
+                    <FolderIcon className="size-4" />
+                    Accept and save to folder…
+                  </button>
+                )}
+                <button
+                  onClick={() => sessionRef.current?.accept()}
+                  className={canPickFolder ? btn.secondary : btn.primary}
+                >
+                  <DownloadIcon className="size-4" />
+                  {canPickFolder ? "Accept, download in browser" : "Accept"}
+                </button>
+                <button onClick={() => sessionRef.current?.decline()} className={btn.ghost}>
+                  Decline
+                </button>
+              </div>
+            )}
+
             {inProgress && (
-              <button
-                onClick={() => sessionRef.current?.cancel()}
-                className="rounded-lg px-4 py-2.5 text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-              >
+              <button onClick={() => sessionRef.current?.cancel()} className={btn.ghost}>
                 Cancel transfer
               </button>
             )}
 
             {phase === "done" &&
-              (snap?.sinkKind === "folder" ? (
-                <p className="text-center text-sm font-medium text-green-600 dark:text-green-500">
-                  Saved to the folder you chose.
-                </p>
-              ) : links.size > 1 ? (
-                <button
-                  onClick={downloadAll}
-                  className="rounded-lg bg-indigo-500 px-4 py-2.5 text-center text-sm font-medium text-white hover:bg-indigo-600"
-                >
+              snap?.sinkKind !== "folder" &&
+              (links.size > 1 ? (
+                <button onClick={downloadAll} className={btn.primary}>
+                  <DownloadIcon className="size-4" />
                   Save all {links.size} files
                 </button>
               ) : (
                 [...links.values()].map(({ url, name }) => (
-                  <a
-                    key={url}
-                    href={url}
-                    download={name}
-                    className="rounded-lg bg-indigo-500 px-4 py-2.5 text-center text-sm font-medium text-white hover:bg-indigo-600"
-                  >
-                    Save {name}
+                  <a key={url} href={url} download={name} className={`${btn.primary} min-w-0`}>
+                    <DownloadIcon className="size-4 shrink-0" />
+                    <span className="truncate">Save {name}</span>
                   </a>
                 ))
               ))}
@@ -181,19 +181,22 @@ export default function ReceivePage() {
         )}
 
         {snap?.message && (
-          <p
-            className={`mt-4 text-center text-sm ${
-              phase === "error"
-                ? "font-medium text-red-600 dark:text-red-500"
-                : phase === "reconnecting"
-                  ? "text-amber-600 dark:text-amber-500"
-                  : "text-zinc-500"
-            }`}
-          >
-            {snap.message}
-          </p>
+          <div className="mt-4">
+            <Banner
+              tone={phase === "error" ? "bad" : phase === "reconnecting" ? "warn" : "info"}
+              title={phase === "error" ? "Transfer failed" : undefined}
+            >
+              {snap.message}
+            </Banner>
+          </div>
         )}
-      </div>
+
+        {(phase === "declined" || phase === "cancelled" || phase === "error") && (
+          <Link href="/" className={`${btn.secondary} mt-4 w-full`}>
+            Send your own files with Flint
+          </Link>
+        )}
+      </Card>
     </main>
   );
 }

@@ -12,31 +12,37 @@ type Props = {
 export default function TransferProgress({ done, total, speed }: Props) {
   const percent = total > 0 ? Math.min(100, (done / total) * 100) : 100;
   const eta = speed > 0 && done < total ? (total - done) / speed : 0;
+  const complete = percent >= 100;
 
   return (
     <div className="w-full">
+      <div className="flex items-end justify-between gap-3">
+        <span className="font-mono text-2xl font-medium tabular-nums tracking-tight text-fg">
+          {percent.toFixed(0)}
+          <span className="text-subtle">%</span>
+        </span>
+        <span className="pb-1 text-right font-mono text-xs tabular-nums text-muted">
+          {speed > 0 ? formatSpeed(speed) : complete ? "Complete" : "Starting…"}
+          {eta > 0 && <span className="text-subtle"> · {formatDuration(eta)} left</span>}
+        </span>
+      </div>
       <div
-        className="h-2.5 w-full overflow-hidden rounded-full bg-zinc-200 dark:bg-zinc-800"
+        className="mt-2 h-1 w-full overflow-hidden bg-surface-3"
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={Math.round(percent)}
       >
         <div
-          className="h-full rounded-full bg-indigo-500 transition-[width] duration-200 ease-out"
+          className={`h-full transition-[width] duration-200 ease-out ${
+            complete ? "bg-ok" : "bg-fg"
+          }`}
           style={{ width: `${percent}%` }}
         />
       </div>
-      <div className="mt-2 flex items-center justify-between gap-2 text-xs tabular-nums text-zinc-500 dark:text-zinc-400">
-        <span>
-          {formatBytes(done)} / {formatBytes(total)}
-        </span>
-        <span>{percent.toFixed(0)}%</span>
-        <span>
-          {speed > 0 ? formatSpeed(speed) : "–"}
-          {eta > 0 && ` · ${formatDuration(eta)} left`}
-        </span>
-      </div>
+      <p className="mt-2 font-mono text-xs tabular-nums text-muted">
+        {formatBytes(done)} <span className="text-subtle">of</span> {formatBytes(total)}
+      </p>
     </div>
   );
 }

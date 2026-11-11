@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Link from "next/link";
 import "./globals.css";
+import { Logo } from "@/components/ui";
 import { AUTHOR, SITE_DESCRIPTION, SITE_NAME, SITE_TITLE, SITE_URL } from "@/lib/site";
 
 const geistSans = Geist({
@@ -51,15 +53,26 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
+      <body className="flex min-h-full flex-col">
+        <header className="border-b border-line">
+          <div className="mx-auto flex h-12 w-full max-w-5xl items-center justify-between px-4 sm:px-6">
+            <Link href="/" aria-label="Flint home" className="rounded-lg">
+              <Logo />
+            </Link>
+            <span className="hidden text-xs text-muted sm:inline">Direct · encrypted · no uploads</span>
+          </div>
+        </header>
         {children}
-        <footer className="border-t border-zinc-200 bg-zinc-100 py-5 text-center text-xs text-zinc-500 dark:border-zinc-800 dark:bg-black dark:text-zinc-400">
-          <a
-            href={AUTHOR.projectUrl}
-            className="font-medium text-zinc-700 hover:text-indigo-600 hover:underline dark:text-zinc-300 dark:hover:text-indigo-400"
-          >
-            Built by Manas
-          </a>
+        <footer className="border-t border-line">
+          <div className="mx-auto flex w-full max-w-5xl flex-col items-center justify-between gap-2 px-4 py-6 text-xs text-muted sm:flex-row sm:px-6">
+            <span>Files go browser to browser. Nothing is stored.</span>
+            <a
+              href={AUTHOR.projectUrl}
+              className="text-fg hover:underline"
+            >
+              Built by Manas
+            </a>
+          </div>
         </footer>
       </body>
     </html>

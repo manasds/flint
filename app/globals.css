@@ -1,26 +1,124 @@
 @import "tailwindcss";
 
+/*
+ * Flint palette: monochrome, hairline borders. Green/red only for outcomes.
+ * Every color the UI uses is a token here so light and dark stay in step.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f6f6f6;
+  --surface-3: #ececec;
+  --line: #e7e7e7;
+  --line-strong: #d4d4d4;
+  --fg: #111111;
+  --muted: #5f5f5f;
+  --subtle: #9a9a9a;
+  --ink: #111111;
+  --ink-hover: #2b2b2b;
+  --on-ink: #ffffff;
+  /* "ember" is the single accent: kept monochrome on purpose. */
+  --ember: #111111;
+  --ember-strong: #111111;
+  --ember-soft: #f6f6f6;
+  --ember-line: #d4d4d4;
+  --ok: #15803d;
+  --ok-soft: #ffffff;
+  --ok-line: #e7e7e7;
+  --bad: #c62828;
+  --bad-soft: #ffffff;
+  --bad-line: #e7e7e7;
+  --warn: #a16207;
+  --warn-soft: #ffffff;
+  --warn-line: #e7e7e7;
+  --shadow: none;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --bg: #0b0b0b;
+    --surface: #0b0b0b;
+    --surface-2: #161616;
+    --surface-3: #232323;
+    --line: #242424;
+    --line-strong: #333333;
+    --fg: #ededed;
+    --muted: #a0a0a0;
+    --subtle: #6b6b6b;
+    --ink: #ededed;
+    --ink-hover: #ffffff;
+    --on-ink: #0b0b0b;
+    --ember: #ededed;
+    --ember-strong: #ededed;
+    --ember-soft: #161616;
+    --ember-line: #333333;
+    --ok: #4ade80;
+    --ok-soft: #0b0b0b;
+    --ok-line: #242424;
+    --bad: #f87171;
+    --bad-soft: #0b0b0b;
+    --bad-line: #242424;
+    --warn: #facc15;
+    --warn-soft: #0b0b0b;
+    --warn-line: #242424;
+    --shadow: none;
   }
 }
 
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
+  --color-ink: var(--ink);
+  --color-ink-hover: var(--ink-hover);
+  --color-on-ink: var(--on-ink);
+  --color-ember: var(--ember);
+  --color-ember-strong: var(--ember-strong);
+  --color-ember-soft: var(--ember-soft);
+  --color-ember-line: var(--ember-line);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-ok-line: var(--ok-line);
+  --color-bad: var(--bad);
+  --color-bad-soft: var(--bad-soft);
+  --color-bad-line: var(--bad-line);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-warn-line: var(--warn-line);
+  --shadow-card: var(--shadow);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+html {
+  color-scheme: light dark;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+}
+
+::selection {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+:focus-visible {
+  outline: 2px solid var(--ember);
+  outline-offset: 2px;
+}
+
+details > summary {
+  list-style: none;
+}
+details > summary::-webkit-details-marker {
+  display: none;
 }

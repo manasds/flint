@@ -5,6 +5,18 @@ import QRCode from "qrcode";
 import FileList from "@/components/FileList";
 import StatusDot, { type Tone } from "@/components/StatusDot";
 import TransferProgress from "@/components/TransferProgress";
+import {
+  Banner,
+  btn,
+  Card,
+  CheckIcon,
+  CopyIcon,
+  FileIcon,
+  FolderIcon,
+  LinkIcon,
+  QrIcon,
+  UploadIcon,
+} from "@/components/ui";
 import { itemsFromDrop, itemsFromFileList, mergeItems, type SendItem } from "@/lib/files";
 import { randomId } from "@/lib/protocol";
 import { SenderSession, type SenderPhase, type SenderSnapshot } from "@/lib/sender";
@@ -56,7 +68,7 @@ export default function SendFiles() {
     setRoomId(id);
     setLink(url);
     setQr("");
-    QRCode.toDataURL(url, { width: 220, margin: 1 }).then(setQr).catch(() => {});
+    QRCode.toDataURL(url, { width: 312, margin: 0, color: { dark: "#1c1917", light: "#ffffff" } }).then(setQr).catch(() => {});
   }
 
   // Warn before closing the tab mid-transfer.
@@ -93,181 +105,224 @@ export default function SendFiles() {
   const final = phase === "done" || phase === "declined" || phase === "cancelled" || phase === "error";
   const status = phase ? STATUS[phase] : null;
 
+  const fileRows = items.map((i) => ({ path: i.path, size: i.file.size }));
+
   return (
-      <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-8 dark:border-zinc-800 dark:bg-zinc-900">
-        <div className="mb-6 flex items-center justify-between">
-          {/* The page's single H1 lives in app/page.tsx; this is the card's label. */}
-          <p className="text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-            Flint
-          </p>
-          {sharing && status && <StatusDot tone={status.tone} label={status.label} />}
-        </div>
-
-        {!sharing ? (
-          <div className="flex flex-col gap-4">
-            <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragOver(true);
-              }}
-              onDragLeave={(e) => {
-                // dragleave also fires when moving onto a child element; ignore those.
-                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragOver(false);
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDragOver(false);
-                itemsFromDrop(e.dataTransfer).then(addItems);
-              }}
-              className={`flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-8 text-center transition-colors ${
-                dragOver
-                  ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-950/30"
-                  : "border-zinc-300 dark:border-zinc-700"
-              }`}
-            >
-              <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                Drop files or folders here
-              </span>
-              <div className="flex gap-2">
-                <PickButton label="Choose files" onPick={addItems} />
-                <PickButton label="Choose folder" directory onPick={addItems} />
-              </div>
-            </div>
-
-            {items.length > 0 && (
-              <>
-                <FileList
-                  files={items.map((i) => ({ path: i.path, size: i.file.size }))}
-                  onRemove={(idx) => setItems((cur) => cur.filter((_, i) => i !== idx))}
-                />
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setItems([])}
-                    className="rounded-lg px-3 py-2.5 text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                  >
-                    Clear
-                  </button>
-                  <button
-                    onClick={startSharing}
-                    className="flex-1 rounded-lg bg-indigo-500 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-600"
-                  >
-                    Create share link
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        ) : (
-          <div className="flex flex-col gap-6">
-            <FileList files={items.map((i) => ({ path: i.path, size: i.file.size }))} />
-
-            {showLink && (
-              <div className="flex flex-col items-center gap-4">
-                {qr && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={qr} alt="QR code that opens this Flint share link on another device" className="rounded-lg bg-white p-2" width={180} height={180} />
-                )}
-                <div className="flex w-full items-center gap-2">
-                  <input
-                    readOnly
-                    value={link}
-                    className="min-w-0 flex-1 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
-                  />
-                  <button
-                    onClick={copyLink}
-                    className="shrink-0 rounded-lg bg-indigo-500 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-indigo-600"
-                  >
-                    {copied ? "Copied" : "Copy"}
-                  </button>
-                </div>
-                <p className="text-center text-xs text-zinc-500">
-                  Keep this tab open. Share the link; the receiver will see the file list and can
-                  accept or decline.
-                </p>
-              </div>
-            )}
-
-            {phase === "awaiting-accept" && (
-              <p className="text-center text-sm text-zinc-500">
-                Receiver connected. Waiting for them to accept…
-              </p>
-            )}
-
-            {showProgress && snap && (
-              <div className="flex flex-col gap-2">
-                <TransferProgress done={snap.written} total={snap.total} speed={snap.speed} />
-                {snap.fileCount > 1 && (
-                  <p className="text-xs text-zinc-500">
-                    {snap.filesDone} of {snap.fileCount} files saved by receiver
-                  </p>
-                )}
-              </div>
-            )}
-
-            {snap?.message && !final && (
-              <p className="text-center text-xs text-amber-600 dark:text-amber-500">{snap.message}</p>
-            )}
-            {phase === "finishing" && (
-              <p className="text-center text-xs text-zinc-500">
-                All data sent. Waiting for the receiver to confirm it&apos;s saved. Keep this tab open.
-              </p>
-            )}
-            {phase === "done" && (
-              <p className="text-center text-sm font-medium text-green-600 dark:text-green-500">
-                Delivered. The receiver confirmed {snap!.fileCount === 1 ? "the file is" : "all files are"} saved.
-              </p>
-            )}
-            {(phase === "declined" || phase === "cancelled" || phase === "error") && (
-              <p className="text-center text-sm font-medium text-red-600 dark:text-red-500">
-                {snap?.message ?? "Transfer stopped."}
-              </p>
-            )}
-
-            {final ? (
-              <button
-                onClick={reset}
-                className="rounded-lg bg-indigo-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-600"
-              >
-                Send more files
-              </button>
-            ) : (
-              <button
-                onClick={() => {
-                  if (phase && phase !== "waiting") {
-                    sessionRef.current?.cancel();
-                  } else {
-                    // Nobody connected yet: just go back to editing the selection.
-                    setRoomId(null);
-                    setSnap(null);
-                  }
-                }}
-                className="rounded-lg px-4 py-2.5 text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-              >
-                Cancel
-              </button>
-            )}
-          </div>
-        )}
+    <Card>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        {/* The page's single H1 lives in app/page.tsx. */}
+        <h2 className="text-sm font-medium text-fg">
+          {!sharing
+            ? "Send files"
+            : showLink
+              ? "Ready to share"
+              : phase === "done"
+                ? "Sent"
+                : final
+                  ? "Transfer ended"
+                  : "Sending"}
+        </h2>
+        {sharing && status && <StatusDot tone={status.tone} label={status.label} />}
       </div>
+
+      {!sharing ? (
+        <div className="flex flex-col gap-4">
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragOver(true);
+            }}
+            onDragLeave={(e) => {
+              // dragleave also fires when moving onto a child element; ignore those.
+              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragOver(false);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragOver(false);
+              itemsFromDrop(e.dataTransfer).then(addItems);
+            }}
+            className={`flex rounded-md border border-dashed transition-colors ${
+              items.length
+                ? "flex-row items-center gap-3 px-4 py-3 text-left"
+                : "flex-col items-center justify-center gap-4 px-6 py-10 text-center"
+            } ${
+              dragOver
+                ? "border-fg bg-surface-2"
+                : "border-line-strong hover:border-subtle"
+            }`}
+          >
+            <UploadIcon className={`shrink-0 text-subtle ${items.length ? "size-4" : "size-6"}`} />
+            <div className={items.length ? "min-w-0 flex-1" : ""}>
+              <p className="text-sm font-medium text-fg">
+                {items.length ? "Add more" : "Drop files or folders here"}
+              </p>
+              <p className={`text-xs text-muted ${items.length ? "hidden sm:block" : "mt-1"}`}>
+                {items.length ? "Drop here or browse" : "Any type, any size. Nothing is uploaded."}
+              </p>
+            </div>
+            <div className={`flex gap-2 ${items.length ? "shrink-0" : "flex-wrap justify-center"}`}>
+              <PickButton
+                label={items.length ? "Files" : "Choose files"}
+                icon={<FileIcon className="size-3.5" />}
+                onPick={addItems}
+              />
+              <PickButton
+                label={items.length ? "Folder" : "Choose folder"}
+                icon={<FolderIcon className="size-3.5" />}
+                directory
+                onPick={addItems}
+              />
+            </div>
+          </div>
+
+          {items.length > 0 && (
+            <>
+              <FileList
+                files={fileRows}
+                onRemove={(idx) => setItems((cur) => cur.filter((_, i) => i !== idx))}
+              />
+              <div className="flex gap-2">
+                <button onClick={() => setItems([])} className={btn.ghost}>
+                  Clear
+                </button>
+                <button onClick={startSharing} className={`${btn.primary} flex-1`}>
+                  <LinkIcon className="size-4" />
+                  Create share link
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-5">
+          {showLink && (
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col items-center gap-3 rounded-md border border-line p-5">
+                <div className="grid size-[172px] place-items-center rounded bg-white p-2">
+                  {qr ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={qr}
+                      alt="QR code that opens this Flint share link on another device"
+                      width={156}
+                      height={156}
+                    />
+                  ) : (
+                    <QrIcon className="size-10 text-zinc-300" />
+                  )}
+                </div>
+                <p className="text-xs text-muted">Scan to open on another device</p>
+              </div>
+              <div className="flex items-center gap-1 rounded-md border border-line-strong bg-surface p-1 pl-3 focus-within:border-fg">
+                <LinkIcon className="size-4 shrink-0 text-subtle" />
+                <input
+                  readOnly
+                  value={link}
+                  aria-label="Share link"
+                  onFocus={(e) => e.currentTarget.select()}
+                  className="min-w-0 flex-1 bg-transparent px-1 font-mono text-xs text-fg outline-none"
+                />
+                <button
+                  onClick={copyLink}
+                  className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded px-3 text-xs font-medium transition-colors ${
+                    copied ? "text-ok" : "bg-ink text-on-ink hover:bg-ink-hover"
+                  }`}
+                >
+                  {copied ? <CheckIcon className="size-3.5" /> : <CopyIcon className="size-3.5" />}
+                  {copied ? "Copied" : "Copy link"}
+                </button>
+              </div>
+              <p className="text-center text-xs leading-relaxed text-muted">
+                Keep this tab open. The receiver sees the file list and chooses to accept or decline.
+              </p>
+            </div>
+          )}
+
+          {phase === "awaiting-accept" && (
+            <Banner tone="info" title="Receiver connected">
+              Waiting for them to accept the files…
+            </Banner>
+          )}
+
+          {showProgress && snap && (
+            <div className="flex flex-col gap-2">
+              <TransferProgress done={snap.written} total={snap.total} speed={snap.speed} />
+              {snap.fileCount > 1 && phase !== "done" && (
+                <p className="text-xs text-muted">
+                  {snap.filesDone} of {snap.fileCount} files saved by the receiver
+                </p>
+              )}
+            </div>
+          )}
+
+          {snap?.message && !final && <Banner tone="warn">{snap.message}</Banner>}
+          {phase === "finishing" && (
+            <Banner tone="info">
+              All data sent. Waiting for the receiver to confirm it&apos;s saved. Keep this tab open.
+            </Banner>
+          )}
+          {phase === "done" && (
+            <Banner tone="ok">
+              The receiver confirmed {snap!.fileCount === 1 ? "the file is" : "all files are"} saved.
+            </Banner>
+          )}
+          {(phase === "declined" || phase === "cancelled" || phase === "error") && (
+            <Banner tone={phase === "cancelled" ? "info" : "bad"}>
+              {snap?.message ?? "Transfer stopped."}
+            </Banner>
+          )}
+
+          <FileList files={fileRows} done={phase === "done" ? allDone(fileRows.length) : undefined} />
+
+          {final ? (
+            <button onClick={reset} className={btn.primary}>
+              Send more files
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                if (phase && phase !== "waiting") {
+                  sessionRef.current?.cancel();
+                } else {
+                  // Nobody connected yet: just go back to editing the selection.
+                  setRoomId(null);
+                  setSnap(null);
+                }
+              }}
+              className={btn.ghost}
+            >
+              Cancel
+            </button>
+          )}
+        </div>
+      )}
+    </Card>
   );
+}
+
+function allDone(n: number): ReadonlySet<number> {
+  return new Set(Array.from({ length: n }, (_, i) => i));
 }
 
 function PickButton({
   label,
+  icon,
   directory,
   onPick,
 }: {
   label: string;
+  icon: React.ReactNode;
   directory?: boolean;
   onPick: (items: SendItem[]) => void;
 }) {
   return (
-    <label className="cursor-pointer rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:border-indigo-400 dark:border-zinc-600 dark:text-zinc-300">
+    <label className={`${btn.small} focus-within:outline-2 focus-within:outline-fg`}>
+      {icon}
       {label}
       <input
         type="file"
         multiple
-        className="hidden"
+        className="sr-only"
         ref={(el) => {
           if (el && directory) el.setAttribute("webkitdirectory", "");
         }}
