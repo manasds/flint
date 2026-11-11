@@ -41,3 +41,11 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 pnpm-lock.yaml
+
+# pnpm content-addressable package cache
+.pnpm-store/
+
+# match at any depth (project lives in a subfolder)
+node_modules/
+.next/
+.wrangler/

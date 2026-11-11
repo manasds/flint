@@ -55,10 +55,10 @@ export default function Home() {
       <article className="mx-auto w-full max-w-2xl px-4 pb-16 text-zinc-700 sm:px-6 dark:text-zinc-300">
         <Section title="How WebRTC file transfer works">
           <p>
-            Flint is a P2P file transfer tool that runs entirely in your browser. When you pick a
-            file, Flint creates a one-time link and QR code. When the other person opens it, the
-            two browsers connect directly and the file travels between them over a{" "}
-            <strong>WebRTC data channel</strong>.
+            Flint is a P2P file transfer tool that runs entirely in your browser. Pick files or a
+            folder and Flint creates a one-time link and QR code. The other person opens it, sees
+            the file names and sizes, and accepts. The two browsers then connect directly and the
+            files travel between them over <strong>WebRTC data channels</strong>.
           </p>
           <ol className="mt-3 list-decimal space-y-2 pl-5">
             <li>
@@ -73,8 +73,9 @@ export default function Home() {
               won&apos;t work.
             </li>
             <li>
-              <strong>Transfer.</strong> The file is split into chunks and streamed browser to
-              browser. The receiver gets it with its original name and type, ready to save.
+              <strong>Transfer.</strong> Files stream in chunks over several data channels at
+              once. The receiver writes them to disk and confirms each one, so the sender only
+              shows &ldquo;Delivered&rdquo; once everything is saved.
             </li>
           </ol>
         </Section>
@@ -88,6 +89,10 @@ export default function Home() {
             <li>
               <strong>Send files without uploading.</strong> Your file goes straight to the
               other device and is never stored on a server.
+            </li>
+            <li>
+              <strong>Files and folders.</strong> Send many files or a whole folder over one
+              link. The receiver previews names and sizes, then accepts or declines.
             </li>
             <li>
               <strong>Share by link or QR code.</strong> Copy the link, or scan the QR code to
@@ -104,10 +109,10 @@ export default function Home() {
           <p>
             Every WebRTC data channel is encrypted with DTLS. This is built into the WebRTC
             standard and can&apos;t be switched off, and the encryption keys are negotiated by the
-            two browsers. The signaling server only relays connection setup messages; your file
-            never passes through it and never sits on a server. Each link connects a single
-            receiver and stops working when you close the tab. Anyone holding the link can
-            receive the file while it&apos;s open, so share it only with the person it&apos;s for.
+            two browsers. The signaling server only relays connection setup messages; your files
+            never pass through it and never sit on a server. Nothing downloads until the receiver
+            accepts. Each link serves one receiver
+            and stops working when you close the tab, so share it only with the person it&apos;s for.
           </p>
         </Section>
 

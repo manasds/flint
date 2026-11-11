@@ -2,67 +2,82 @@
 
 import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
-import { createSignaling } from "@/lib/signalling";
-import { createSenderConnection } from "@/lib/webrtc";
-import type { SignalMessage } from "@/lib/types";
+import FileList from "@/components/FileList";
+import StatusDot, { type Tone } from "@/components/StatusDot";
 import TransferProgress from "@/components/TransferProgress";
-import StatusDot, { type ConnState } from "@/components/StatusDot";
-import { formatBytes } from "@/lib/format";
+import { itemsFromDrop, itemsFromFileList, mergeItems, type SendItem } from "@/lib/files";
+import { randomId } from "@/lib/protocol";
+import { SenderSession, type SenderPhase, type SenderSnapshot } from "@/lib/sender";
 
-/** The interactive sender card. Rendered inside the server-rendered landing page. */
+const STATUS: Record<SenderPhase, { tone: Tone; label: string }> = {
+  waiting: { tone: "pending", label: "Waiting for receiver" },
+  connecting: { tone: "pending", label: "Connecting" },
+  "awaiting-accept": { tone: "pending", label: "Waiting for accept" },
+  transferring: { tone: "ok", label: "Sending" },
+  finishing: { tone: "pending", label: "Finishing" },
+  reconnecting: { tone: "pending", label: "Reconnecting" },
+  done: { tone: "ok", label: "Delivered" },
+  declined: { tone: "bad", label: "Declined" },
+  cancelled: { tone: "idle", label: "Cancelled" },
+  error: { tone: "bad", label: "Failed" },
+};
+
+/** The interactive sender card, rendered inside the server-rendered landing page. */
 export default function SendFiles() {
-  const [file, setFile] = useState<File | null>(null);
+  const [items, setItems] = useState<SendItem[]>([]);
+  /** Non-null while a share link is live. */
+  const [roomId, setRoomId] = useState<string | null>(null);
+  const sharing = roomId !== null;
   const [link, setLink] = useState("");
   const [qr, setQr] = useState("");
-  const [state, setState] = useState<ConnState>("idle");
-  const [sent, setSent] = useState(0);
+  const [snap, setSnap] = useState<SenderSnapshot | null>(null);
   const [copied, setCopied] = useState(false);
   const [dragOver, setDragOver] = useState(false);
-
-  const connRef = useRef<ReturnType<typeof createSenderConnection> | null>(null);
+  const sessionRef = useRef<SenderSession | null>(null);
 
   useEffect(() => {
-    if (!file) return;
-
-    const id = crypto.randomUUID().slice(0, 8);
-    const url = `${window.location.origin}/r/${id}`;
-    setLink(url);
-    QRCode.toDataURL(url, { width: 220, margin: 1 }).then(setQr).catch(() => {});
-    setState("waiting");
-    setSent(0);
-
-    const sig = createSignaling(id, "sender", (msg: SignalMessage) => {
-      if (msg.type === "peer-joined") {
-        setState("connecting");
-        const conn = createSenderConnection(file, sig.send, (bytes) => {
-          setSent(bytes);
-          if (bytes >= file.size) setState("done");
-        });
-        connRef.current = conn;
-        conn.pc.onconnectionstatechange = () => {
-          const s = conn.pc.connectionState;
-          if (s === "connected") {
-            setState((prev) => (prev === "done" ? prev : "connected"));
-          } else if (s === "failed" || s === "disconnected") {
-            setState("error");
-          }
-        };
-      } else if (msg.type === "answer" || msg.type === "ice-candidate") {
-        connRef.current?.handleSignal(msg);
-      } else if (msg.type === "peer-left") {
-        setState("error");
-      }
-    });
-
+    if (!roomId || !items.length) return;
+    const session = new SenderSession(items, roomId, setSnap);
+    sessionRef.current = session;
+    session.start();
+    if (process.env.NODE_ENV !== "production") {
+      // Dev-only handle for debugging/e2e tests (e.g. simulating a dropped link).
+      (window as unknown as { __flintSender?: SenderSession }).__flintSender = session;
+    }
     return () => {
-      sig.close();
-      connRef.current?.pc.close();
-      connRef.current = null;
+      session.dispose();
+      sessionRef.current = null;
     };
-  }, [file]);
+  }, [roomId, items]);
 
-  function pickFile(f: File | null | undefined) {
-    if (f) setFile(f);
+  function startSharing() {
+    const id = randomId(10);
+    const url = `${window.location.origin}/r/${id}`;
+    setRoomId(id);
+    setLink(url);
+    setQr("");
+    QRCode.toDataURL(url, { width: 220, margin: 1 }).then(setQr).catch(() => {});
+  }
+
+  // Warn before closing the tab mid-transfer.
+  useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (sessionRef.current?.busy) e.preventDefault();
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, []);
+
+  function addItems(incoming: SendItem[]) {
+    if (incoming.length) setItems((cur) => mergeItems(cur, incoming));
+  }
+
+  function reset() {
+    setRoomId(null);
+    setItems([]);
+    setSnap(null);
+    setLink("");
+    setQr("");
   }
 
   async function copyLink() {
@@ -71,70 +86,86 @@ export default function SendFiles() {
     setTimeout(() => setCopied(false), 1500);
   }
 
-  const showProgress = state === "connecting" || state === "connected" || state === "done";
+  const phase = snap?.phase;
+  const showLink = sharing && (!phase || phase === "waiting" || phase === "connecting");
+  const showProgress =
+    phase === "transferring" || phase === "finishing" || phase === "reconnecting" || phase === "done";
+  const final = phase === "done" || phase === "declined" || phase === "cancelled" || phase === "error";
+  const status = phase ? STATUS[phase] : null;
 
   return (
-      <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-8 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm sm:p-8 dark:border-zinc-800 dark:bg-zinc-900">
         <div className="mb-6 flex items-center justify-between">
           {/* The page's single H1 lives in app/page.tsx; this is the card's label. */}
           <p className="text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
             Flint
           </p>
-          {state !== "idle" && <StatusDot state={state} />}
+          {sharing && status && <StatusDot tone={status.tone} label={status.label} />}
         </div>
 
-        {!file ? (
-          <label
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragOver(true);
-            }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={(e) => {
-              e.preventDefault();
-              setDragOver(false);
-              pickFile(e.dataTransfer.files?.[0]);
-            }}
-            className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-10 text-center transition-colors ${
-              dragOver
-                ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-950/30"
-                : "border-zinc-300 hover:border-indigo-400 dark:border-zinc-700"
-            }`}
-          >
-            <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-              Drop a file here
-            </span>
-            <span className="text-xs text-zinc-500 dark:text-zinc-500">or click to browse</span>
-            <input
-              type="file"
-              className="hidden"
-              onChange={(e) => pickFile(e.target.files?.[0])}
-            />
-          </label>
-        ) : (
-          <div className="flex flex-col gap-6">
-            <div className="flex items-center justify-between rounded-xl bg-zinc-50 p-4 dark:bg-zinc-800/50">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                  {file.name}
-                </p>
-                <p className="text-xs text-zinc-500">{formatBytes(file.size)}</p>
+        {!sharing ? (
+          <div className="flex flex-col gap-4">
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragOver(true);
+              }}
+              onDragLeave={(e) => {
+                // dragleave also fires when moving onto a child element; ignore those.
+                if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragOver(false);
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragOver(false);
+                itemsFromDrop(e.dataTransfer).then(addItems);
+              }}
+              className={`flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-8 text-center transition-colors ${
+                dragOver
+                  ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-950/30"
+                  : "border-zinc-300 dark:border-zinc-700"
+              }`}
+            >
+              <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                Drop files or folders here
+              </span>
+              <div className="flex gap-2">
+                <PickButton label="Choose files" onPick={addItems} />
+                <PickButton label="Choose folder" directory onPick={addItems} />
               </div>
             </div>
 
-            {showProgress ? (
-              <TransferProgress sent={sent} total={file.size} />
-            ) : (
+            {items.length > 0 && (
+              <>
+                <FileList
+                  files={items.map((i) => ({ path: i.path, size: i.file.size }))}
+                  onRemove={(idx) => setItems((cur) => cur.filter((_, i) => i !== idx))}
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setItems([])}
+                    className="rounded-lg px-3 py-2.5 text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+                  >
+                    Clear
+                  </button>
+                  <button
+                    onClick={startSharing}
+                    className="flex-1 rounded-lg bg-indigo-500 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-600"
+                  >
+                    Create share link
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-6">
+            <FileList files={items.map((i) => ({ path: i.path, size: i.file.size }))} />
+
+            {showLink && (
               <div className="flex flex-col items-center gap-4">
                 {qr && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={qr}
-                    alt="QR code that opens this file's Flint download link on another device"
-                    className="rounded-lg bg-white p-2"
-                    width={180}
-                    height={180}
-                  />
+                  <img src={qr} alt="QR code that opens this Flint share link on another device" className="rounded-lg bg-white p-2" width={180} height={180} />
                 )}
                 <div className="flex w-full items-center gap-2">
                   <input
@@ -150,23 +181,101 @@ export default function SendFiles() {
                   </button>
                 </div>
                 <p className="text-center text-xs text-zinc-500">
-                  Keep this tab open. Share the link, and the file sends when they connect.
+                  Keep this tab open. Share the link; the receiver will see the file list and can
+                  accept or decline.
                 </p>
               </div>
             )}
 
-            {state === "done" && (
-              <p className="text-center text-sm font-medium text-green-600 dark:text-green-500">
-                File sent.
+            {phase === "awaiting-accept" && (
+              <p className="text-center text-sm text-zinc-500">
+                Receiver connected. Waiting for them to accept…
               </p>
             )}
-            {state === "error" && (
-              <p className="text-center text-sm font-medium text-red-600 dark:text-red-500">
-                Connection lost.
+
+            {showProgress && snap && (
+              <div className="flex flex-col gap-2">
+                <TransferProgress done={snap.written} total={snap.total} speed={snap.speed} />
+                {snap.fileCount > 1 && (
+                  <p className="text-xs text-zinc-500">
+                    {snap.filesDone} of {snap.fileCount} files saved by receiver
+                  </p>
+                )}
+              </div>
+            )}
+
+            {snap?.message && !final && (
+              <p className="text-center text-xs text-amber-600 dark:text-amber-500">{snap.message}</p>
+            )}
+            {phase === "finishing" && (
+              <p className="text-center text-xs text-zinc-500">
+                All data sent. Waiting for the receiver to confirm it&apos;s saved. Keep this tab open.
               </p>
+            )}
+            {phase === "done" && (
+              <p className="text-center text-sm font-medium text-green-600 dark:text-green-500">
+                Delivered. The receiver confirmed {snap!.fileCount === 1 ? "the file is" : "all files are"} saved.
+              </p>
+            )}
+            {(phase === "declined" || phase === "cancelled" || phase === "error") && (
+              <p className="text-center text-sm font-medium text-red-600 dark:text-red-500">
+                {snap?.message ?? "Transfer stopped."}
+              </p>
+            )}
+
+            {final ? (
+              <button
+                onClick={reset}
+                className="rounded-lg bg-indigo-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-600"
+              >
+                Send more files
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  if (phase && phase !== "waiting") {
+                    sessionRef.current?.cancel();
+                  } else {
+                    // Nobody connected yet: just go back to editing the selection.
+                    setRoomId(null);
+                    setSnap(null);
+                  }
+                }}
+                className="rounded-lg px-4 py-2.5 text-sm text-zinc-600 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                Cancel
+              </button>
             )}
           </div>
         )}
       </div>
+  );
+}
+
+function PickButton({
+  label,
+  directory,
+  onPick,
+}: {
+  label: string;
+  directory?: boolean;
+  onPick: (items: SendItem[]) => void;
+}) {
+  return (
+    <label className="cursor-pointer rounded-lg border border-zinc-300 px-3 py-1.5 text-xs font-medium text-zinc-700 hover:border-indigo-400 dark:border-zinc-600 dark:text-zinc-300">
+      {label}
+      <input
+        type="file"
+        multiple
+        className="hidden"
+        ref={(el) => {
+          if (el && directory) el.setAttribute("webkitdirectory", "");
+        }}
+        onChange={(e) => {
+          onPick(itemsFromFileList(e.target.files));
+          e.target.value = "";
+        }}
+      />
+    </label>
   );
 }

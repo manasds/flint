@@ -35,6 +35,8 @@ export class Room extends DurableObject<Env> {
 
     switch (msg.type) {
       case "join": {
+        // A socket joins once; re-joining could switch it to the other role.
+        if (deserializeRole(ws)) return;
         if (isRoleTaken(sockets, msg.role)) {
           send(ws, { type: "error", message: "Role taken" });
           return;
@@ -43,7 +45,13 @@ export class Room extends DurableObject<Env> {
         ws.serializeAttachment({ role: msg.role } satisfies SocketAttachment);
 
         const other = getOtherSocket(sockets, ws, msg.role);
-        if (other) send(other, { type: "peer-joined", role: msg.role });
+        if (other) {
+          send(other, { type: "peer-joined", role: msg.role });
+          // Also tell the joiner its peer is already here, so a client that
+          // reconnects (e.g. after a network blip) can re-establish WebRTC.
+          const otherRole = deserializeRole(other);
+          if (otherRole) send(ws, { type: "peer-joined", role: otherRole });
+        }
         break;
       }
       case "offer":
