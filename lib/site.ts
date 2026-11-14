@@ -38,6 +38,11 @@ export const FAQ: { question: string; answer: string }[] = [
       "Yes, in modern mobile browsers with WebRTC support, such as Chrome and Safari. Scan the QR code to open the link, and keep the tab in the foreground, since mobile browsers may pause background tabs.",
   },
   {
+    question: "Can I send to my other device without a link or QR code?",
+    answer:
+      "Yes, if both are on the same network. Open Flint on both devices and each shows the other under Send to a nearby device. Flint finds them by their shared public internet address, so devices on a VPN or using different connections (for example Wi-Fi and mobile data) won't see each other; use the link instead. Anyone else behind the same address, like on shared office Wi-Fi, can also see your device name, and nothing downloads until you accept.",
+  },
+  {
     question: "Can several people download from the same link?",
     answer:
       "No. Each link connects one sender to one receiver. Once someone has joined, anyone else who opens the link is turned away. To send to another person, create a new link.",

@@ -246,3 +246,38 @@ export function ChevronIcon(props: IconProps) {
     </Svg>
   );
 }
+
+export function LaptopIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="4" y="5" width="16" height="11" rx="1.5" />
+      <path d="M2 19h20" />
+    </Svg>
+  );
+}
+
+export function PhoneIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="7" y="3" width="10" height="18" rx="2" />
+      <path d="M11 18h2" />
+    </Svg>
+  );
+}
+
+export function TabletIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="5" y="3" width="14" height="18" rx="2" />
+      <path d="M11 18h2" />
+    </Svg>
+  );
+}
+
+export function ArrowRightIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M5 12h14m0 0-5-5m5 5-5 5" />
+    </Svg>
+  );
+}

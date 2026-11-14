@@ -79,6 +79,10 @@ const FEATURES = [
     body: "Send many files or a whole folder over one link. The receiver previews names and sizes, then accepts or declines.",
   },
   {
+    title: "Send to nearby devices.",
+    body: "Open Flint on two devices on the same Wi-Fi and pick the other one from the list. No link or QR code needed.",
+  },
+  {
     title: "Share by link or QR code.",
     body: "Copy the link, or scan the QR code to move a file from your laptop to your phone.",
   },

@@ -1,6 +1,6 @@
 import type { Role, SignalMessage } from "./types";
 
-const SIGNALING_URL = (
+export const SIGNALING_URL = (
   process.env.NEXT_PUBLIC_SIGNALING_URL ?? "wss://flintmanasbuilds.up.railway.app"
 ).replace(/\/$/, "");
 

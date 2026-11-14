@@ -74,3 +74,9 @@ Message types live in [`types.ts`](./types.ts). Behavior matches the previous No
 - `peer-joined` goes only to the other seat
 - `offer` / `answer` / `ice-candidate` relay to the other seat
 - `peer-left` on disconnect; empty rooms hibernate until the next join
+
+## Nearby devices (lobby)
+
+`wss://…/_lobby` joins the **Lobby** Durable Object for the caller's network, keyed from `CF-Connecting-IP` (full IPv4 address, or the IPv6 /64 prefix). Every open Flint tab announces `{ type: "hello", device: { id, name, kind } }` and receives `peers`, then `peer` / `peer-left` updates. A sender picks a device and sends `invite { to, roomId, count, total }`; the server stamps the real `from` and forwards it. The receiver then joins that `roomId` as a normal Room, so the transfer and accept/decline flow are unchanged. `invite-cancel` and `invite-busy` are forwarded the same way.
+
+Clients send `"ping"` every 25 s (answered by a hibernation auto-response). An alarm drops sockets that stop pinging, so sleeping laptops leave the list.
